@@ -1,0 +1,35 @@
+data:
+    dataset: "celeba"
+    shape: [3, 64, 64]
+    random_flip: true
+    zero_center: true
+
+network:
+    hidden_channels: 64
+    num_blocks: 2
+    channel_mults: [1, 2, 2, 2, 4]
+    attention_sizes: [16, ]
+    dropout: 0.1
+    group_norm: 32
+    do_conv_sample: True
+
+diffusion:
+    beta_schedule: linear
+    beta_start: 0.0001
+    beta_end: 0.02
+    num_t: 1000
+    num_t_steps: 50
+
+training:
+    batch_size: 128
+    epoch_max: 6400
+    log_frequency: 3200
+
+optimizer:
+    name: "adam"
+    learning_rate: 0.0002
+    weight_decay: 0.0
+    beta_1: 0.9
+    amsgrad: false
+    epsilon: 1e-8
+    gradient_clip: 1.0
