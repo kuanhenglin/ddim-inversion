@@ -1,17 +1,24 @@
 data:
     dataset: "celeba"
     shape: [3, 64, 64]
+    shape_original: [3, 218, 178]
+    num_train: 162770
+    num_valid: 19867
+    num_test: 19962
     random_flip: true
     zero_center: true
+    num_workers: 4
+    download: false
 
 network:
-    hidden_channels: 64
+    hidden_channels: 32
     num_blocks: 2
     channel_mults: [1, 2, 2, 2, 4]
-    attention_sizes: [16, ]
+    attention_sizes: [16,]
     dropout: 0.1
-    group_norm: 32
-    do_conv_sample: True
+    group_norm: 16
+    ema: 0.9999
+    do_conv_sample: true
 
 diffusion:
     beta_schedule: linear
@@ -19,17 +26,20 @@ diffusion:
     beta_end: 0.02
     num_t: 1000
     num_t_steps: 50
+    eta: 0.0
 
 training:
-    batch_size: 128
-    epoch_max: 6400
-    log_frequency: 3200
+    batch_size: 64
+    log_batch_size: 64
+    epoch_max: 25
+    log_frequency: 250
+    tensorboard: true
 
 optimizer:
     name: "adam"
-    learning_rate: 0.0002
-    weight_decay: 0.0
+    learning_rate: 0.00005
+    weight_decay: 0.0001
     beta_1: 0.9
     amsgrad: false
-    epsilon: 1e-8
+    epsilon: 0.00000001
     gradient_clip: 1.0

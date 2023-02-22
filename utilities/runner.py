@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+import torch.nn.functional as F
 
 
 def beta_schedule(schedule, beta_start, beta_end, num_t):
@@ -26,3 +27,14 @@ def beta_schedule(schedule, beta_start, beta_end, num_t):
 
     assert betas.shape == (num_t,)  # Sanity check that their shapes match
     return betas
+
+
+def alpha(b, t):
+    """
+    Insert 0.0 to left of betas and select index with t + 1. We do this (instead of no insert and
+    select with t) because t = -1 is possible, and we want a_t = 0.0 when that happens.
+    """
+    t = t.to(torch.int32)  # t needs to be int to be treated as indices
+    b = F.pad(b, (1, 0), value=0.0)
+    a_t = (1 - b).cumprod(dim=0).index_select(dim=0, index=t + 1)[:, None, None, None]
+    return a_t

@@ -25,10 +25,3 @@ def time_embed(t, embed_dim):
     if embed_dim % 2 == 1:  # Zero padding if embed_dim is odd
         embed = F.pad(embed, (0, 1, 0, 0))
     return embed
-
-
-def get_loss(output, e, reduce=False):
-    loss = (e - output).square().sum(dim=(1, 2, 3))  # sum of squares
-    if reduce:  # Take average of loss across the batch
-        loss = loss.mean(dim=0)
-    return loss

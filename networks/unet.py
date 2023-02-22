@@ -214,7 +214,7 @@ class UNet(nn.Module):
                                   kernel_size=3, stride=1, padding=1)
 
     def forward(self, x, t):
-        assert x.shape[-3:] == self.in_shape, \
+        assert list(x.shape[-3:]) == self.in_shape, \
                f"Shape of x {tuple(x.shape)} does not match network definition."
 
         # Time embedding
