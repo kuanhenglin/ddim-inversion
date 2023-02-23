@@ -70,7 +70,6 @@ class Diffusion:
             writer = tensorboard.SummaryWriter(log_dir=f"logs/run_{self.datetime}")
 
         train_dataset = dutils.get_dataset(name=config.data.dataset, shape=config.data.shape,
-                                           shape_original=config.data.shape_original,
                                            root=config.data.root, split="train",
                                            download=config.data.download)
         train_loader = data.DataLoader(train_dataset, batch_size=config.training.batch_size,

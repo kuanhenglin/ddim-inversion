@@ -12,7 +12,7 @@ data:
     flip_horizontal: 0.5
     flip_vertical: 0.0
     num_workers: 4
-    download: false
+    download: true
 
 network:
     hidden_channels: 32

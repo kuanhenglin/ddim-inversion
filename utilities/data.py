@@ -2,13 +2,12 @@ from torch import jit, nn
 from torchvision import datasets, transforms
 
 
-def get_dataset(name, shape, shape_original, root="~/.torch/datasets", split="train",
+def get_dataset(name, shape, root="~/.torch/datasets", split="train",
                 download=False):
     assert shape[-2] == shape[-1], "Last two dimensions of shape must match (i.e., square)."
 
-    shape_small = min(*shape_original[-2:])
-    transform = transforms.Compose([transforms.CenterCrop((shape_small,) * 2),
-                                    transforms.Resize(shape[-2:]), transforms.ToTensor()])
+    transform = transforms.Compose([transforms.Resize(shape[-2]), transforms.CenterCrop(shape[-2:]),
+                                    transforms.ToTensor()])
     if name == "celeba":
         dataset = datasets.CelebA(root=root, split=split, transform=transform, download=download)
     elif name == "flowers102":
