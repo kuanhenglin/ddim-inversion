@@ -1,7 +1,7 @@
 data:
-    dataset: "celeba"
+    dataset: "flowers102"
     shape: [3, 64, 64]
-    shape_original: [3, 218, 178]
+    shape_original: [3, 500, 500]
     num_train: 162770
     num_valid: 19867
     num_test: 19962

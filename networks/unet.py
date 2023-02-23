@@ -9,7 +9,7 @@ class Upsample(nn.Module):
 
     def __init__(self, in_channels, do_conv=True):
         super().__init__()
-        self.do_conv = True
+        self.do_conv = do_conv
         if do_conv:  # Use convolution for downsampling instead of linear interpolation
             self.conv = nn.Conv2d(in_channels, in_channels, kernel_size=3, stride=1, padding=1)
 
@@ -122,7 +122,7 @@ class AttentionBlock(nn.Module):
 class UNet(nn.Module):
 
     def __init__(self, in_shape, hidden_channels, num_blocks, channel_mults, attention_sizes,
-                 dropout=0.0, group_norm=32, do_conv_sample=True):
+                 time_embed_channels, dropout=0.0, group_norm=16, do_conv_sample=True):
         super().__init__()
 
         assert in_shape[1] == in_shape[2], f"Input shape must be square."
@@ -134,7 +134,6 @@ class UNet(nn.Module):
 
         # Time embedding
 
-        time_embed_channels = hidden_channels * 4
         self.time_embed = nn.Module()
         self.time_embed.dense = nn.ModuleList([
             nn.Linear(hidden_channels, time_embed_channels),
@@ -151,8 +150,8 @@ class UNet(nn.Module):
         for i in range(len(channel_mults)):
             blocks = nn.ModuleList()
             attentions = nn.ModuleList()
-            in_channels_block = hidden_channels * in_channel_mults[i]
-            out_channels_block = hidden_channels * channel_mults[i]
+            in_channels_block = round(hidden_channels * in_channel_mults[i])
+            out_channels_block = round(hidden_channels * channel_mults[i])
             # Add num_blocks Resnet blocks (with Attention blocks)
             for _ in range(num_blocks):
                 blocks.append(ResnetBlock(in_channels_block, out_channels_block,
@@ -187,8 +186,8 @@ class UNet(nn.Module):
         for i in reversed(range(len(channel_mults))):
             blocks = nn.ModuleList()
             attentions = nn.ModuleList()
-            out_channels_block = hidden_channels * channel_mults[i]
-            in_channels_skip = hidden_channels * channel_mults[i]
+            out_channels_block = round(hidden_channels * channel_mults[i])
+            in_channels_skip = round(hidden_channels * channel_mults[i])
             for j in range(num_blocks + 1):
                 if j == num_blocks:
                     in_channels_skip = hidden_channels * in_channel_mults[i]
@@ -212,6 +211,7 @@ class UNet(nn.Module):
         self.out_norm = nutils.group_norm(in_channels_block, num_groups=group_norm)
         self.out_conv = nn.Conv2d(in_channels_block, in_shape[0],
                                   kernel_size=3, stride=1, padding=1)
+        self.out_conv.weight.data.fill_(0.0)
 
     def forward(self, x, t):
         assert list(x.shape[-3:]) == self.in_shape, \

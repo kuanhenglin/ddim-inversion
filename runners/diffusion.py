@@ -1,5 +1,6 @@
-from functools import partial
+from copy import deepcopy
 from datetime import datetime
+from functools import partial
 
 import numpy as np
 import torch
@@ -9,6 +10,7 @@ import torchvision.utils as vutils
 from tqdm.notebook import tqdm
 
 from networks.unet import UNet
+from networks.ema import EMA
 import utilities.data as dutils
 import utilities.optimizer as outils
 import utilities.runner as rutils
@@ -34,12 +36,19 @@ class Diffusion:
         network = UNet(
             in_shape=config.data.shape, hidden_channels=config.network.hidden_channels,
             num_blocks=config.network.num_blocks, channel_mults=config.network.channel_mults,
-            attention_sizes=config.network.attention_sizes, dropout=config.network.dropout,
+            attention_sizes=config.network.attention_sizes,
+            time_embed_channels=config.network.embed_channels, dropout=config.network.dropout,
             group_norm=config.network.group_norm, do_conv_sample=config.network.do_conv_sample)
         network = network.to(device)
         self.network = network
 
-        config_transform = {"zero_center": config.data.zero_center}
+        # Exponential moving average for weights (duplicate network)
+        if config.network.ema > 0.0:
+            self.ema = EMA(network, mu=config.network.ema, device=device)
+        else:
+            self.ema = None
+
+        config_transform = {"zero_center": config.data.zero_center, "clamp": config.data.clamp}
         self.data_transform = partial(dutils.data_transform, **config_transform)
         self.inverse_data_transform = partial(dutils.inverse_data_transform, **config_transform)
 
@@ -63,6 +72,7 @@ class Diffusion:
                                        shuffle=True, num_workers=config.data.num_workers)
 
         network = self.network
+        ema = self.ema
 
         optimizer = outils.get_optimizer(
             name=config.optimizer.name, parameters=network.parameters(),
@@ -79,7 +89,7 @@ class Diffusion:
                 network.train()
 
                 x_0 = x_0.to(self.device)
-                x_0 = self.data_transform(x_0, zero_center=config.data.zero_center)
+                x_0 = self.data_transform(x_0)
                 e = torch.randn_like(x_0)  # Noise to mix with x_0 to create x_t
 
                 # Arithmetic sampling
@@ -98,12 +108,17 @@ class Diffusion:
                     pass
                 optimizer.step()
 
+                if ema is not None:
+                    ema.update(network)
+
                 if log_tensorboard:
                     writer.add_scalar("train_loss", loss.detach().cpu(), global_step=i + 1)
                     if (i + 1) % config.training.log_frequency == 0 or i == 0:
-                        log_images = self.sample(x=self.x_fixed, batch_size=64, sequence=False)
-                        log_images_grid = vutils.make_grid(log_images)
-                        writer.add_image("fixed_noise", log_images_grid.cpu(), global_step=i + 1)
+                        log_images_grid = self.log_grid(x=self.x_fixed, batch_size=64)
+                        writer.add_image("fixed_noise", log_images_grid, global_step=i + 1)
+                        log_ema_images_grid = self.log_grid(x=self.x_fixed, batch_size=64,
+                                                            network=ema.ema)
+                        writer.add_image("fixed_noise_ema", log_ema_images_grid, global_step=i + 1)
 
                 i += 1
 
@@ -126,12 +141,12 @@ class Diffusion:
         output = self.network(x_t, t=t.to(torch.float32))  # Predicted e
         return output
 
-    @torch.no_grad()
-    def p_sample(self, x, num_t=None, num_t_steps=None, skip_type="uniform", eta=None,
+    def p_sample(self, x, network=None, num_t=None, num_t_steps=None, skip_type="uniform", eta=None,
                  sequence=False):
         config = self.config
 
-        self.network.eval()
+        network = utils.get_default(network, default=self.network)
+        network.eval()
 
         # We can choose to start from a non-max num_t (e.g., for partial generation)
         num_t = utils.get_default(num_t, default=config.diffusion.num_t)
@@ -162,7 +177,7 @@ class Diffusion:
             a_t_next = rutils.alpha(b=b, t=t_next)
 
             x_t = x_t_predictions[-1].to(self.device)
-            e_t = self.network(x_t, t=t)
+            e_t = network(x_t, t=t)
 
             x_0_t = (x_t - (1.0 - a_t).sqrt() * e_t) / a_t.sqrt()  # DDIM Eq. 12, "predicted x_0"
             x_0_predictions.append(x_0_t.detach().cpu())
@@ -182,7 +197,6 @@ class Diffusion:
             return x_t_predictions[-1]
         return x_t_predictions, x_0_predictions  # Return entire generation process
 
-    @torch.no_grad()
     def sample(self, x=None, batch_size=None, sequence=False, **kwargs):
         config = self.config
 
@@ -190,6 +204,8 @@ class Diffusion:
 
         noise = torch.randn(batch_size, *config.data.shape, device=self.device, dtype=torch.float32)
         x = utils.get_default(x, default=noise)
+        if len(x.shape) == 3:
+            x = x.unsqueeze(dim=0)
         outputs = self.p_sample(x, sequence=sequence, **kwargs)
 
         if not sequence:  # Only final generated images
@@ -200,6 +216,13 @@ class Diffusion:
         x_t_predictions = [self.inverse_data_transform(x_t) for x_t in x_t_predictions]
         x_0_predictions = [self.inverse_data_transform(x_0) for x_0 in x_0_predictions]
         return x_t_predictions, x_0_predictions
+
+    def log_grid(self, x=None, batch_size=64, **kwargs):
+        x = utils.get_default(x, default=self.x_fixed)
+        with torch.no_grad():
+            log_images = self.sample(x=x, batch_size=batch_size, sequence=False, **kwargs)
+        log_images_grid = vutils.make_grid(log_images)
+        return log_images_grid
 
     def size(self):
         size = utils.get_size(self.network)
