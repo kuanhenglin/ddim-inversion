@@ -1,3 +1,5 @@
+from functools import partial
+
 import torch
 from torch import nn
 import torch.nn.functional as F
@@ -135,6 +137,7 @@ class UNet(nn.Module):
         # Time embedding
 
         self.time_embed = nn.Module()
+        self.time_embed.fn = partial(nutils.time_embed, embed_dim=hidden_channels)
         self.time_embed.dense = nn.ModuleList([
             nn.Linear(hidden_channels, time_embed_channels),
             nn.Linear(time_embed_channels, time_embed_channels)])
@@ -218,7 +221,7 @@ class UNet(nn.Module):
                f"Shape of x {tuple(x.shape)} does not match network definition."
 
         # Time embedding
-        t_embed = nutils.time_embed(t, embed_dim=self.hidden_channels)
+        t_embed = self.time_embed.fn(t)
         t_embed = self.time_embed.dense[0](t_embed)
         t_embed = nutils.swish(t_embed)
         t_embed = self.time_embed.dense[1](t_embed)

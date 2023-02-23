@@ -30,7 +30,7 @@ def get_namespace(config_dict):
 
 
 def get_yaml(path):
-    with open("./configs/celeba.yml") as f:
+    with open(path) as f:
         config = yaml.safe_load(f)
     config = get_namespace(config)
     return config

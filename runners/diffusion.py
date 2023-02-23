@@ -7,7 +7,7 @@ import torch
 from torch import nn
 from torch.utils import data, tensorboard
 import torchvision.utils as vutils
-from tqdm.notebook import tqdm
+from tqdm.auto import tqdm
 
 from networks.unet import UNet
 from networks.ema import EMA
@@ -37,7 +37,8 @@ class Diffusion:
             in_shape=config.data.shape, hidden_channels=config.network.hidden_channels,
             num_blocks=config.network.num_blocks, channel_mults=config.network.channel_mults,
             attention_sizes=config.network.attention_sizes,
-            time_embed_channels=config.network.embed_channels, dropout=config.network.dropout,
+            time_embed_channels=config.network.embed_channels,
+            dropout=config.network.dropout,
             group_norm=config.network.group_norm, do_conv_sample=config.network.do_conv_sample)
         network = network.to(device)
         self.network = network
@@ -51,6 +52,9 @@ class Diffusion:
         config_transform = {"zero_center": config.data.zero_center, "clamp": config.data.clamp}
         self.data_transform = partial(dutils.data_transform, **config_transform)
         self.inverse_data_transform = partial(dutils.inverse_data_transform, **config_transform)
+
+        self.data_augmentation = dutils.Augmentation(flip_horizontal=config.data.flip_horizontal,
+                                                     flip_vertical=config.data.flip_vertical)
 
         self.x_fixed = torch.randn(config.training.log_batch_size, *config.data.shape,
                                    device=self.device, dtype=torch.float32)
@@ -66,7 +70,8 @@ class Diffusion:
             writer = tensorboard.SummaryWriter(log_dir=f"logs/run_{self.datetime}")
 
         train_dataset = dutils.get_dataset(name=config.data.dataset, shape=config.data.shape,
-                                           shape_original=config.data.shape_original, split="train",
+                                           shape_original=config.data.shape_original,
+                                           root=config.data.root, split="train",
                                            download=config.data.download)
         train_loader = data.DataLoader(train_dataset, batch_size=config.training.batch_size,
                                        shuffle=True, num_workers=config.data.num_workers)
@@ -80,10 +85,10 @@ class Diffusion:
             weight_decay=config.optimizer.weight_decay, beta_1=config.optimizer.beta_1,
             amsgrad=config.optimizer.amsgrad, epsilon=config.optimizer.epsilon)
 
+        progress = tqdm(total=config.training.num_i, position=0)
         i = 0
-        epoch_total = int(np.ceil(config.data.num_train / config.training.batch_size))
-        for _ in tqdm(range(config.training.epoch_max), position=0):
-            for _, (x_0, _) in tqdm(enumerate(train_loader), total=epoch_total, leave=False):
+        while i < config.training.num_i:
+            for _, (x_0, _) in enumerate(train_loader):
 
                 n = x_0.shape[0]
                 network.train()
@@ -97,7 +102,7 @@ class Diffusion:
                                   device=self.device)
                 t = torch.cat((t, config.diffusion.num_t - t - 1), dim=0)[:n]
                 output = self.q_sample(x_0=x_0, t=t, e=e)  # Estimate noise added
-                loss = (e - output).square().sum(dim=(1, 2, 3)).mean(dim=0)  # Sum of squares
+                loss = rutils.criterion(output, e, name=config.training.criterion)
 
                 optimizer.zero_grad()
                 loss.backward()
@@ -121,6 +126,9 @@ class Diffusion:
                         writer.add_image("fixed_noise_ema", log_ema_images_grid, global_step=i + 1)
 
                 i += 1
+                progress.update(1)
+                if i >= config.training.num_i:  # Training for exactly num_i iterations
+                    break
 
     def q_sample(self, x_0, t, e):
         """

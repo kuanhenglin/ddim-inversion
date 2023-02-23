@@ -38,3 +38,15 @@ def alpha(b, t):
     b = F.pad(b, (1, 0), value=0.0)
     a_t = (1 - b).cumprod(dim=0).index_select(dim=0, index=t + 1)[:, None, None, None]
     return a_t
+
+
+def criterion(output, target, name="l2"):
+    if name == "l1":
+        loss = (target - output).abs().mean()
+    elif name == "l2":
+        loss = (target - output).square().mean()
+    elif name == "linf":
+        loss = (target - output).max(dim=(1, 2, 3)).mean()
+    else:
+        raise NotImplementedError(name)
+    return loss

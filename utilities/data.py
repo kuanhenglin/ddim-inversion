@@ -1,17 +1,20 @@
+from torch import jit, nn
 from torchvision import datasets, transforms
 
 
-def get_dataset(name, shape, shape_original, split="train", download=False):
+def get_dataset(name, shape, shape_original, root="~/.torch/datasets", split="train",
+                download=False):
     assert shape[-2] == shape[-1], "Last two dimensions of shape must match (i.e., square)."
 
     shape_small = min(*shape_original[-2:])
     transform = transforms.Compose([transforms.CenterCrop((shape_small,) * 2),
                                     transforms.Resize(shape[-2:]), transforms.ToTensor()])
     if name == "celeba":
-        dataset = datasets.CelebA(root="~/.torch/datasets", split=split, transform=transform,
-                                  download=download)
+        dataset = datasets.CelebA(root=root, split=split, transform=transform, download=download)
     elif name == "flowers102":
-        dataset = datasets.Flowers102(root="~./torch/datasets", split=split, transform=transform,
+        # The split for Flowers102 is weird, as test has the highest number of images
+        split_map = {"train": "test", "valid": "val", "test": "train"}
+        dataset = datasets.Flowers102(root=root, split=split_map[split], transform=transform,
                                       download=download)
     else:
         raise NotImplementedError(f"Dataset name {name} not supported.")
@@ -30,3 +33,23 @@ def inverse_data_transform(x, zero_center=True, clamp=True, **kwargs):
     if clamp:
         x = x.clamp(min=0.0, max=1.0)
     return x
+
+
+class Augmentation:
+
+    def __init__(self, flip_horizontal=0.0, flip_vertical=0.0, **kwargs):
+        augmentations = []
+        if flip_horizontal > 0.0:
+            augmentations.append(transforms.RandomHorizontalFlip(p=flip_horizontal))
+        if flip_vertical > 0.0:
+            augmentations.append(transforms.RandomVerticalFlip(p=flip_vertical))
+        if len(augmentations) == 0:
+            self.augmentation = None
+        else:
+            augmentation = nn.Sequential(*augmentations)
+            self.augmentation = jit.script(augmentation)
+
+    def __call__(self, x):
+        if self.augmentation is not None:
+            x = self.augmentation(x)
+        return x
