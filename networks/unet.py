@@ -177,11 +177,11 @@ class UNet(nn.Module):
         self.mid_layers = nn.ModuleList()
         self.mid_layers.block_1 = ResnetBlock(in_channels_block, in_channels_block,
                                               time_embed_channels=time_embed_channels,
-                                              dropout=dropout)
+                                              dropout=dropout, group_norm=group_norm)
         self.mid_layers.attention = AttentionBlock(in_channels_block, group_norm=group_norm)
         self.mid_layers.block_2 = ResnetBlock(in_channels_block, in_channels_block,
                                               time_embed_channels=time_embed_channels,
-                                              dropout=dropout)
+                                              dropout=dropout, group_norm=group_norm)
 
         # Upsampling layers
 

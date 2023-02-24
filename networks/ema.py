@@ -8,7 +8,7 @@ class EMA:
     def __init__(self, network, mu=0.999, device=torch.device("cuda")):
         self.mu = mu
         self.ema = deepcopy(network).to(device)
-        self.ema.eval()
+        self.ema.eval()  # We are not training the EMA
 
     def __call__(self, *args, **kwargs):
         return self.ema(*args, **kwargs)
@@ -23,3 +23,12 @@ class EMA:
 
     def state_dict(self):
         return self.ema.state_dict()
+
+    def load_state_dict(self, state_dict):
+        self.ema.load_state_dict(state_dict)
+
+    def train(self):
+        self.ema.train()
+
+    def eval(self):
+        self.ema.eval()

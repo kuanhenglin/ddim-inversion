@@ -1,11 +1,11 @@
 data:
-    dataset: "celeba"
-    root: "~/.torch/datasets"
-    shape: [3, 96, 96]
-    shape_original: [3, 218, 178]
-    num_train: 162770
-    num_valid: 19867
-    num_test: 19962
+    dataset: "church"
+    root: "/home/jordan/.torch/datasets"
+    shape: [3, 64, 64]
+    shape_original: [3, 256, 256]
+    num_train: 126227
+    num_valid: 300
+    num_test: 0
     random_flip: true
     zero_center: true
     clamp: true
@@ -18,8 +18,8 @@ network:
     hidden_channels: 32
     num_blocks: 2
     channel_mults: [1, 2, 3, 3, 4]
-    attention_sizes: [24,]
-    embed_channels: 128
+    attention_sizes: [16,]
+    embed_channels: 64
     dropout: 0.1
     group_norm: 16
     ema: 0.999

@@ -15,6 +15,10 @@ def get_dataset(name, shape, root="~/.torch/datasets", split="train",
         split_map = {"train": "test", "valid": "val", "test": "train"}
         dataset = datasets.Flowers102(root=root, split=split_map[split], transform=transform,
                                       download=download)
+    elif name == "church":
+        split_map = {"train": "train", "valid": "val", "test": "val"}
+        dataset = datasets.LSUN(root=root, classes=[f"church_outdoor_{split_map[split]}"],
+                                transform=transform)
     else:
         raise NotImplementedError(f"Dataset name {name} not supported.")
     return dataset

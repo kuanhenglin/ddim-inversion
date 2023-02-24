@@ -7,7 +7,7 @@ import torch
 from torch import nn
 from torch.utils import data, tensorboard
 import torchvision.utils as vutils
-from tqdm.auto import tqdm
+from tqdm import tqdm
 
 from networks.unet import UNet
 from networks.ema import EMA
@@ -66,8 +66,9 @@ class Diffusion:
 
         log_tensorboard = utils.get_default(log_tensorboard, default=config.training.tensorboard)
         writer = None
+        log_path = f"logs/run_{self.datetime}"
         if log_tensorboard:
-            writer = tensorboard.SummaryWriter(log_dir=f"logs/run_{self.datetime}")
+            writer = tensorboard.SummaryWriter(log_dir=log_path)
 
         train_dataset = dutils.get_dataset(name=config.data.dataset, shape=config.data.shape,
                                            root=config.data.root, split="train",
@@ -124,6 +125,13 @@ class Diffusion:
                                                             network=ema.ema)
                         writer.add_image("fixed_noise_ema", log_ema_images_grid, global_step=i + 1)
 
+                if (i + 1) % config.training.save_frequency == 0 or i + 1 == config.training.num_i:
+                    torch.save(self.network.state_dict(),
+                               f"{log_path}/network_{config.training.num_i}.pth")
+                    if ema is not None:
+                        torch.save(self.ema.state_dict(),
+                                   f"{log_path}/ema_{config.training.num_i}.pth")
+
                 i += 1
                 progress.update(1)
                 if i >= config.training.num_i:  # Training for exactly num_i iterations
@@ -149,8 +157,11 @@ class Diffusion:
         return output
 
     def p_sample(self, x, network=None, num_t=None, num_t_steps=None, skip_type="uniform", eta=None,
-                 sequence=False):
+                 ema=True, sequence=False):
         config = self.config
+
+        if ema and network is None and self.ema is not None:
+            network = self.ema
 
         network = utils.get_default(network, default=self.network)
         network.eval()
@@ -183,7 +194,7 @@ class Diffusion:
             a_t = rutils.alpha(b=b, t=t)
             a_t_next = rutils.alpha(b=b, t=t_next)
 
-            x_t = x_t_predictions[-1].to(self.device)
+            x_t = x_t_predictions[-1]
             e_t = network(x_t, t=t)
 
             x_0_t = (x_t - (1.0 - a_t).sqrt() * e_t) / a_t.sqrt()  # DDIM Eq. 12, "predicted x_0"
@@ -198,7 +209,8 @@ class Diffusion:
             x_d = ((1.0 - a_t_next) - s_t.square()).sqrt() * e_t
 
             x_t_next = a_t_next.sqrt() * x_0_t + x_d + e  # DDIM Eq. 12
-            x_t_predictions.append(x_t_next.detach().cpu())
+            x_t_predictions.append(x_t_next)
+            x_t_predictions[-2] = x_t_predictions[-2].detach().cpu()
 
         if not sequence:  # Only return final generated images
             return x_t_predictions[-1]
@@ -234,3 +246,17 @@ class Diffusion:
     def size(self):
         size = utils.get_size(self.network)
         return size
+
+    def load(self, path, ema=True):
+        if ema:
+            self.ema.load_state_dict(torch.load(path))
+        else:
+            self.network.load_state_dict(torch.load(path))
+
+    def freeze(self, ema=True):
+        if ema:
+            params = self.ema.ema.parameters()
+        else:
+            params = self.network.parameters()
+        for param in params:  # Freeze all layers to save backpropagation memory
+            param.requires_grad = False
