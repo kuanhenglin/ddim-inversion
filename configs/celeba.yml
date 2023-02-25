@@ -22,7 +22,7 @@ network:
     embed_channels: 64
     dropout: 0.0
     num_groups: -1
-    ema: 0.999
+    ema: 0.9999
     do_conv_sample: true
 
 diffusion:

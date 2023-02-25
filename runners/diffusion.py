@@ -38,7 +38,7 @@ class Diffusion:
             num_blocks=config.network.num_blocks, channel_mults=config.network.channel_mults,
             attention_sizes=config.network.attention_sizes,
             time_embed_channels=config.network.embed_channels, dropout=config.network.dropout,
-            group_norm=config.network.num_groups, do_conv_sample=config.network.do_conv_sample)
+            num_groups=config.network.num_groups, do_conv_sample=config.network.do_conv_sample)
         network = network.to(device)
         self.network = network
 

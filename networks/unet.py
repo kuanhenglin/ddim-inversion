@@ -86,10 +86,10 @@ class ResnetBlock(nn.Module):
 
 class AttentionBlock(nn.Module):
 
-    def __init__(self, in_channels, group_norm=32):
+    def __init__(self, in_channels, num_groups=32):
         super().__init__()
 
-        self.norm = nutils.group_norm(in_channels, num_groups=group_norm)
+        self.norm = nutils.group_norm(in_channels, num_groups=num_groups)
         self.Q = nn.Conv2d(in_channels, in_channels, kernel_size=1, stride=1, padding=0)
         self.K = nn.Conv2d(in_channels, in_channels, kernel_size=1, stride=1, padding=0)
         self.V = nn.Conv2d(in_channels, in_channels, kernel_size=1, stride=1, padding=0)
@@ -124,7 +124,7 @@ class AttentionBlock(nn.Module):
 class UNet(nn.Module):
 
     def __init__(self, in_shape, hidden_channels, num_blocks, channel_mults, attention_sizes,
-                 time_embed_channels, dropout=0.0, group_norm=16, do_conv_sample=True):
+                 time_embed_channels, dropout=0.0, num_groups=16, do_conv_sample=True):
         super().__init__()
 
         assert in_shape[1] == in_shape[2], f"Input shape must be square."
@@ -159,10 +159,10 @@ class UNet(nn.Module):
             for _ in range(num_blocks):
                 blocks.append(ResnetBlock(in_channels_block, out_channels_block,
                                           time_embed_channels=time_embed_channels,
-                                          dropout=dropout, group_norm=group_norm))
+                                          dropout=dropout, num_groups=num_groups))
                 in_channels_block = out_channels_block
                 if current_size in attention_sizes:
-                    attentions.append(AttentionBlock(in_channels_block, group_norm=group_norm))
+                    attentions.append(AttentionBlock(in_channels_block, num_groups=num_groups))
             # Create down layer as nn.Module
             down_layer = nn.Module()
             down_layer.blocks = blocks
@@ -177,11 +177,11 @@ class UNet(nn.Module):
         self.mid_layers = nn.ModuleList()
         self.mid_layers.block_1 = ResnetBlock(in_channels_block, in_channels_block,
                                               time_embed_channels=time_embed_channels,
-                                              dropout=dropout, group_norm=group_norm)
-        self.mid_layers.attention = AttentionBlock(in_channels_block, group_norm=group_norm)
+                                              dropout=dropout, num_groups=num_groups)
+        self.mid_layers.attention = AttentionBlock(in_channels_block, num_groups=num_groups)
         self.mid_layers.block_2 = ResnetBlock(in_channels_block, in_channels_block,
                                               time_embed_channels=time_embed_channels,
-                                              dropout=dropout, group_norm=group_norm)
+                                              dropout=dropout, num_groups=num_groups)
 
         # Upsampling layers
 
@@ -196,10 +196,10 @@ class UNet(nn.Module):
                     in_channels_skip = hidden_channels * in_channel_mults[i]
                 blocks.append(ResnetBlock(in_channels_block + in_channels_skip, out_channels_block,
                                           time_embed_channels=time_embed_channels,
-                                          dropout=dropout, group_norm=group_norm))
+                                          dropout=dropout, num_groups=num_groups))
                 in_channels_block = out_channels_block
                 if current_size in attention_sizes:
-                    attentions.append(AttentionBlock(in_channels_block, group_norm=group_norm))
+                    attentions.append(AttentionBlock(in_channels_block, num_groups=num_groups))
             # Create up layer as nn.Module
             up_layer = nn.Module()
             up_layer.blocks = blocks
@@ -211,7 +211,7 @@ class UNet(nn.Module):
 
         # End layers
 
-        self.out_norm = nutils.group_norm(in_channels_block, num_groups=group_norm)
+        self.out_norm = nutils.group_norm(in_channels_block, num_groups=num_groups)
         self.out_conv = nn.Conv2d(in_channels_block, in_shape[0],
                                   kernel_size=3, stride=1, padding=1)
         self.out_conv.weight.data.fill_(0.0)

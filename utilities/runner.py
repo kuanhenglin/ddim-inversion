@@ -4,7 +4,6 @@ import torch.nn.functional as F
 
 
 def beta_schedule(schedule, beta_start, beta_end, num_t):
-
     def sigmoid(x):
         x = (-x).exp().add(1.0).reciprocal()  # 1 / (e^-x + 1)
         return x
@@ -47,6 +46,24 @@ def criterion(output, target, name="l2"):
         loss = (target - output).square().mean()
     elif name == "linf":
         loss = (target - output).max(dim=(1, 2, 3)).mean()
+    elif name == "psnr":
+        mse = (target - output).square().mean()
+        loss = 10 * mse.log10()  # There is -20 * log10(MAX), but MAX = 1.0 since range is [0, 1]
+    elif name == "ssim":
+        output_mean = output.mean()
+        output_variance = output.var()
+        target_mean = target.mean()
+        target_variance = target.var()
+        covariance = ((output - output_mean) * (target - target_mean)).mean()
+        c_1 = np.square(0.01)
+        c_2 = np.square(0.03)
+        c_3 = c_2 / 2
+        luminance = (2 * output_mean * target_mean + c_1) / \
+                    (output_mean.square() + target_mean.square() + c_1)
+        contrast = (2 * output_variance.sqrt() * target_variance.sqrt() + c_2) / \
+                   (output_variance + target_variance + c_2)
+        structure = (covariance + c_3) / (output_variance.sqrt() * target_variance.sqrt() + c_3)
+        loss = 1.0 - luminance * contrast * structure
     else:
         raise NotImplementedError(name)
     return loss
