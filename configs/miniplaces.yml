@@ -1,10 +1,10 @@
 data:
-    dataset: "church"
+    dataset: "miniplaces"
     root: "~/.torch/datasets"
     shape: [3, 64, 64]
-    shape_original: [3, 256, 256]
-    num_train: 126227
-    num_valid: 300
+    shape_original: [3, 128, 128]
+    num_train: 100000
+    num_valid: 10000
     num_test: 0
     random_flip: true
     zero_center: true

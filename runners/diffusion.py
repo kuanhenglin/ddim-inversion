@@ -37,9 +37,8 @@ class Diffusion:
             in_shape=config.data.shape, hidden_channels=config.network.hidden_channels,
             num_blocks=config.network.num_blocks, channel_mults=config.network.channel_mults,
             attention_sizes=config.network.attention_sizes,
-            time_embed_channels=config.network.embed_channels,
-            dropout=config.network.dropout,
-            group_norm=config.network.group_norm, do_conv_sample=config.network.do_conv_sample)
+            time_embed_channels=config.network.embed_channels, dropout=config.network.dropout,
+            group_norm=config.network.num_groups, do_conv_sample=config.network.do_conv_sample)
         network = network.to(device)
         self.network = network
 
@@ -119,18 +118,18 @@ class Diffusion:
                 if log_tensorboard:
                     writer.add_scalar("train_loss", loss.detach().cpu(), global_step=i + 1)
                     if (i + 1) % config.training.log_frequency == 0 or i == 0:
-                        log_images_grid = self.log_grid(x=self.x_fixed, batch_size=64)
+                        log_images_grid = self.log_grid(x=self.x_fixed, batch_size=64, ema=False)
                         writer.add_image("fixed_noise", log_images_grid, global_step=i + 1)
-                        log_ema_images_grid = self.log_grid(x=self.x_fixed, batch_size=64,
-                                                            network=ema.ema)
+                        log_ema_images_grid = self.log_grid(x=self.x_fixed, batch_size=64, ema=True)
                         writer.add_image("fixed_noise_ema", log_ema_images_grid, global_step=i + 1)
 
                 if (i + 1) % config.training.save_frequency == 0 or i + 1 == config.training.num_i:
+                    i_file = str(i + 1).zfill(len(str(config.training.num_i)))
                     torch.save(self.network.state_dict(),
-                               f"{log_path}/network_{config.training.num_i}.pth")
+                               f"{log_path}/network_{i_file}.pth")
                     if ema is not None:
                         torch.save(self.ema.state_dict(),
-                                   f"{log_path}/ema_{config.training.num_i}.pth")
+                                   f"{log_path}/ema_{i_file}.pth")
 
                 i += 1
                 progress.update(1)
@@ -160,7 +159,7 @@ class Diffusion:
                  ema=True, sequence=False):
         config = self.config
 
-        if ema and network is None and self.ema is not None:
+        if ema and (network is None) and (self.ema is not None):
             network = self.ema
 
         network = utils.get_default(network, default=self.network)
@@ -209,7 +208,7 @@ class Diffusion:
             x_d = ((1.0 - a_t_next) - s_t.square()).sqrt() * e_t
 
             x_t_next = a_t_next.sqrt() * x_0_t + x_d + e  # DDIM Eq. 12
-            x_t_predictions.append(x_t_next)
+            x_t_predictions.append(x_t_next)  # Only keep gradients of final x_t prediction
             x_t_predictions[-2] = x_t_predictions[-2].detach().cpu()
 
         if not sequence:  # Only return final generated images

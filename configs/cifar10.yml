@@ -1,11 +1,11 @@
 data:
-    dataset: "church"
+    dataset: "cifar10"
     root: "~/.torch/datasets"
-    shape: [3, 64, 64]
-    shape_original: [3, 256, 256]
-    num_train: 126227
-    num_valid: 300
-    num_test: 0
+    shape: [3, 32, 32]
+    shape_original: [3, 32, 32]
+    num_train: 50000
+    num_valid: 0
+    num_test: 10000
     random_flip: true
     zero_center: true
     clamp: true
@@ -17,7 +17,7 @@ data:
 network:
     hidden_channels: 32
     num_blocks: 2
-    channel_mults: [1, 2, 3, 3, 4]
+    channel_mults: [1, 2, 2, 3]
     attention_sizes: [16,]
     embed_channels: 64
     dropout: 0.0
@@ -34,10 +34,10 @@ diffusion:
     eta: 0.0
 
 training:
-    batch_size: 64
+    batch_size: 128
     log_batch_size: 64
     criterion: l1
-    num_i: 60000
+    num_i: 30000
     log_frequency: 300
     save_frequency: 6000
     tensorboard: true

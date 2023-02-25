@@ -1,7 +1,7 @@
 data:
     dataset: "celeba"
     root: "~/.torch/datasets"
-    shape: [3, 96, 96]
+    shape: [3, 64, 64]
     shape_original: [3, 218, 178]
     num_train: 162770
     num_valid: 19867
@@ -18,10 +18,10 @@ network:
     hidden_channels: 32
     num_blocks: 2
     channel_mults: [1, 2, 3, 3, 4]
-    attention_sizes: [24,]
-    embed_channels: 128
-    dropout: 0.1
-    group_norm: 16
+    attention_sizes: [16,]
+    embed_channels: 64
+    dropout: 0.0
+    num_groups: -1
     ema: 0.999
     do_conv_sample: true
 
@@ -39,7 +39,7 @@ training:
     criterion: l1
     num_i: 60000
     log_frequency: 300
-    save_frequency: 3000
+    save_frequency: 6000
     tensorboard: true
 
 optimizer:

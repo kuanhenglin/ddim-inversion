@@ -9,7 +9,9 @@ def swish(x):
     return x
 
 
-def group_norm(in_channels, num_groups=32):
+def group_norm(in_channels, num_groups=-1):
+    if num_groups == -1:  # Default to batch normalization
+        return nn.BatchNorm2d(num_features=in_channels, eps=1e-6, affine=True)
     assert in_channels % num_groups == 0, \
            f"in_channels {in_channels} must be divisible by num_groups {num_groups}"
     return nn.GroupNorm(num_groups=num_groups, num_channels=in_channels, eps=1e-6, affine=True)
