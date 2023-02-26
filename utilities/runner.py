@@ -48,7 +48,7 @@ def criterion(output, target, name="l2"):
         loss = (target - output).max(dim=(1, 2, 3)).mean()
     elif name == "psnr":
         mse = (target - output).square().mean()
-        loss = 10 * mse.log10()  # There is -20 * log10(MAX), but MAX = 1.0 since range is [0, 1]
+        loss = -10 * mse.log10()  # There is +20 * log10(MAX), but MAX = 1.0 since range is [0, 1]
     elif name == "ssim":
         output_mean = output.mean()
         output_variance = output.var()
@@ -63,7 +63,7 @@ def criterion(output, target, name="l2"):
         contrast = (2 * output_variance.sqrt() * target_variance.sqrt() + c_2) / \
                    (output_variance + target_variance + c_2)
         structure = (covariance + c_3) / (output_variance.sqrt() * target_variance.sqrt() + c_3)
-        loss = 1.0 - luminance * contrast * structure
+        loss = luminance * contrast * structure
     else:
         raise NotImplementedError(name)
     return loss
