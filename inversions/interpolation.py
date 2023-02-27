@@ -4,9 +4,9 @@ from tqdm import tqdm
 
 
 def slerp(z_1, z_2, alpha):
-    theta = torch.acos(torch.sum(z_1 * z_2) / (torch.norm(z_1) * torch.norm(z_2)))
-    return torch.sin((1.0 - alpha) * theta) / torch.sin(theta) * z_1 + \
-        torch.sin(alpha * theta) / torch.sin(theta) * z_2
+    theta = torch.acos((z_1 * z_2).sum() / (torch.norm(z_1) * torch.norm(z_2)))
+    return (((1.0 - alpha) * theta).sin() / theta.sin()) * z_1 + \
+        ((alpha * theta).sin() / theta.sin()) * z_2
 
 
 def interpolation(z_1, z_2, diffusion, num_t_steps=10, num_alphas=10, show_progress=False):
@@ -21,11 +21,11 @@ def interpolation(z_1, z_2, diffusion, num_t_steps=10, num_alphas=10, show_progr
 
 
 def proj_interpolation(z_1, z_2, diffusion, proj_fn_1=None, proj_fn_2=None,
-                       num_t_steps=10, num_alphas=10, show_progress=False):
+                       num_t_steps=10, num_alphas=100, show_progress=False):
     if proj_fn_1 is not None:
-        z_1 = proj_fn_1(z_1)
+        z_1 = proj_fn_1(z_1, sequence=False)
     if proj_fn_2 is not None:
-        z_2 = proj_fn_2(z_2)
+        z_2 = proj_fn_2(z_2, sequence=False)
     x_mixes = interpolation(z_1, z_2, diffusion, num_t_steps=num_t_steps, num_alphas=num_alphas,
                             show_progress=show_progress)
     return x_mixes

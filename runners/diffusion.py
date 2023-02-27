@@ -1,4 +1,4 @@
-from copy import deepcopy
+import os
 from datetime import datetime
 from functools import partial
 
@@ -68,6 +68,10 @@ class Diffusion:
         log_path = f"logs/run_{self.datetime}"
         if log_tensorboard:
             writer = tensorboard.SummaryWriter(log_dir=log_path)
+        else:
+            os.mkdir(log_path)
+
+        torch.save(self.x_fixed.detach().cpu(), f"{log_path}/fixed_noise.pth")
 
         train_dataset = dutils.get_dataset(name=config.data.dataset, shape=config.data.shape,
                                            root=config.data.root, split="train",
@@ -235,11 +239,11 @@ class Diffusion:
         x_0_predictions = [self.inverse_data_transform(x_0) for x_0 in x_0_predictions]
         return x_t_predictions, x_0_predictions
 
-    def log_grid(self, x=None, batch_size=64, **kwargs):
+    def log_grid(self, x=None, batch_size=64, value=1.0, **kwargs):
         x = utils.get_default(x, default=self.x_fixed)
         with torch.no_grad():
             log_images = self.sample(x=x, batch_size=batch_size, sequence=False, **kwargs)
-        log_images_grid = vutils.make_grid(log_images)
+        log_images_grid = vutils.make_grid(log_images, pad_value=value)
         return log_images_grid
 
     def size(self):
