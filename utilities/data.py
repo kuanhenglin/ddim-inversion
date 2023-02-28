@@ -34,6 +34,9 @@ def get_dataset(name, shape, root="~/.torch/datasets", split="train",
     elif name == "cifar100":
         split_map = {"train": True, "valid": False, "test": False}
         dataset = datasets.CIFAR100(root=root, train=split_map[split], transform=transform)
+    elif name == "anime":
+        split_map = {"train": "train", "valid": "valid", "test": "valid"}
+        dataset = datasets.ImageFolder(root=f"{root}/anime/{split_map[split]}", transform=transform)
     else:
         raise NotImplementedError(f"Dataset name {name} not supported.")
     return dataset

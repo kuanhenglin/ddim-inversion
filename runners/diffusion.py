@@ -250,11 +250,12 @@ class Diffusion:
         size = utils.get_size(self.network)
         return size
 
-    def load(self, path, ema=True):
+    def load(self, path, name, ema=True):
         if ema:
-            self.ema.load_state_dict(torch.load(path))
+            self.ema.load_state_dict(torch.load(f"{path}/{name}", map_location=self.device))
         else:
-            self.network.load_state_dict(torch.load(path))
+            self.network.load_state_dict(torch.load(f"{path}/{name}", map_location=self.device))
+        self.x_fixed = torch.load(f"{path}/fixed_noise.pth", map_location=self.device)
 
     def freeze(self, ema=True):
         if ema:

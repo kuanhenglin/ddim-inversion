@@ -6,8 +6,8 @@ import utilities.runner as rutils
 import utilities.utilities as utils
 
 
-def gradient_inversion(z=None, target=None, diffusion=None, lr=0.01, num_i=100, num_t_steps=10,
-                       criterion="l1", sequence=False, show_progress=False):
+def gradient_inversion(z=None, target=None, diffusion=None, optimizer="adam", lr=0.01, num_i=300,
+                       num_t_steps=10, criterion="l1", sequence=False, show_progress=False):
     device = diffusion.device
 
     z = utils.get_default(z, default=torch.randn(*target.shape, device=device))
@@ -16,7 +16,15 @@ def gradient_inversion(z=None, target=None, diffusion=None, lr=0.01, num_i=100, 
     z.requires_grad_()
 
     maximize = criterion in ["psnr", "ssim"]
-    optimizer = optim.Adam([z], lr=lr, betas=(0.9, 0.999), eps=1e-8, maximize=maximize)
+    if optimizer == "adam":  # Vanilla Adam
+        optimizer = optim.Adam([z], lr=lr, betas=(0.9, 0.999), eps=1e-8, maximize=maximize)
+        scheduler = None
+    elif optimizer == "sgd":  # SGD w/ Nesterov momentum + piece-wise constant decay
+        optimizer = optim.SGD([z], lr=lr, momentum=0.9, nesterov=True, maximize=maximize)
+        scheduler = optim.lr_scheduler.MultiStepLR(
+            optimizer, milestones=[num_i // 3, 2 * (num_i // 3)], gamma=0.1)
+    else:
+        raise NotImplementedError(optimizer)
     target = target.to(device)
 
     z_trained = []
@@ -33,6 +41,8 @@ def gradient_inversion(z=None, target=None, diffusion=None, lr=0.01, num_i=100, 
         loss = rutils.criterion(y, target, name=criterion)
         loss.backward()
         optimizer.step()
+        if scheduler is not None:
+            scheduler.step()
         optimizer.zero_grad()
         if show_progress:
             progress.set_description(f"Loss: {loss.detach().cpu().abs().numpy():.7}")
