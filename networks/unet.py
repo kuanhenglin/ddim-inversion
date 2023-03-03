@@ -45,9 +45,7 @@ class ResnetBlock(nn.Module):
     def __init__(self, in_channels, out_channels=None, do_conv_skip=False,
                  dropout=0.0, time_embed_channels=512, num_groups=32):
         super().__init__()
-        self.in_channels = in_channels
         out_channels = in_channels if out_channels is None else out_channels
-        self.out_channels = out_channels
 
         # Convolution layer 1
         self.norm_1 = nutils.group_norm(in_channels, num_groups=num_groups)
@@ -55,13 +53,15 @@ class ResnetBlock(nn.Module):
         self.time_embed_proj = nn.Linear(time_embed_channels, out_channels)
         # Convolution layer 2
         self.norm_2 = nutils.group_norm(out_channels, num_groups=num_groups)
-        self.dropout = nn.Dropout(dropout)
+        self.dropout = nn.Dropout(p=dropout)
         self.conv_2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=1, padding=1)
         # ResNet skip layer (with 3x3 kernel option available with do_conv_skip)
         if in_channels != out_channels:
             kernel_size = 3 if do_conv_skip else 1  # Skip with larger kernel
             self.conv_skip = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size,
                                        stride=1, padding=kernel_size // 2)
+        else:  # Identity skip (do nothing)
+            self.conv_skip = nn.Identity()
 
     def forward(self, x, time_embed):
         h = x  # Order for each layer: norm -> activation -> conv
@@ -77,9 +77,7 @@ class ResnetBlock(nn.Module):
         h = self.dropout(h)  # Apply dropout on second convolution layer
         h = self.conv_2(h)
 
-        if self.in_channels != self.out_channels:
-            x = self.conv_skip(x)
-
+        x = self.conv_skip(x)
         h = x + h
         return h
 

@@ -42,6 +42,10 @@ training:
     save_frequency: 6000
     tensorboard: true
 
+evaluation:
+    batch_size: 64
+    num_batches: 64
+
 optimizer:
     name: adam
     learning_rate: 0.0001

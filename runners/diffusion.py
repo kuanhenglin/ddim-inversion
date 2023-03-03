@@ -240,6 +240,8 @@ class Diffusion:
         return x_t_predictions, x_0_predictions
 
     def log_grid(self, x=None, batch_size=64, value=1.0, **kwargs):
+        if x == "random":
+            x = torch.randn(batch_size, *self.config.data.shape).to(self.device)
         x = utils.get_default(x, default=self.x_fixed)
         with torch.no_grad():
             log_images = self.sample(x=x, batch_size=batch_size, sequence=False, **kwargs)
@@ -263,4 +265,4 @@ class Diffusion:
         else:
             params = self.network.parameters()
         for param in params:  # Freeze all layers to save backpropagation memory
-            param.requires_grad = False
+            param.requires_grad_(False)
