@@ -58,9 +58,9 @@ def criterion(output, target, name="l2"):
         c_1 = np.square(0.01)
         c_2 = np.square(0.03)
         c_3 = c_2 / 2
-        luminance = (2 * output_mean * target_mean + c_1) / \
+        luminance = (2 * output_mean * target_mean + c_1) /\
                     (output_mean.square() + target_mean.square() + c_1)
-        contrast = (2 * output_variance.sqrt() * target_variance.sqrt() + c_2) / \
+        contrast = (2 * output_variance.sqrt() * target_variance.sqrt() + c_2) /\
                    (output_variance + target_variance + c_2)
         structure = (covariance + c_3) / (output_variance.sqrt() * target_variance.sqrt() + c_3)
         loss = luminance * contrast * structure

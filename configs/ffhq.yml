@@ -1,0 +1,56 @@
+data:
+    dataset: "ffhq"
+    root: "~/.torch/datasets"
+    shape: [3, 64, 64]
+    shape_original: [3, 128, 128]
+    num_train: 65000
+    num_valid: 5000
+    num_test: 0
+    random_flip: true
+    zero_center: true
+    clamp: true
+    flip_horizontal: 0.5
+    flip_vertical: 0.0
+    num_workers: 4
+    download: true
+
+network:
+    hidden_channels: 128
+    num_blocks: 2
+    channel_mults: [1, 2, 2, 2, 4]
+    attention_sizes: [16,]
+    embed_channels: 128
+    dropout: 0.1
+    num_groups: 32
+    ema: 0.9995
+    do_conv_sample: true
+
+diffusion:
+    beta_schedule: linear
+    beta_start: 0.0001
+    beta_end: 0.02
+    num_t: 1000
+    num_t_steps: 50
+    eta: 0.0
+
+training:
+    batch_size: 64
+    log_batch_size: 64
+    criterion: l1
+    num_i: 72000
+    log_frequency: 300
+    save_frequency: 6000
+    tensorboard: true
+
+evaluation:
+    batch_size: 64
+    num_batches: 64
+
+optimizer:
+    name: adam
+    learning_rate: 0.0002
+    weight_decay: 0.0
+    beta_1: 0.9
+    amsgrad: false
+    epsilon: 0.00000001
+    gradient_clip: 1.0

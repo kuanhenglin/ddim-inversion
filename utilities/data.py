@@ -17,6 +17,10 @@ def get_dataset(name, shape, root="~/.torch/datasets", split="train",
                                     transforms.ToTensor()])
     if name == "celeba":
         dataset = datasets.CelebA(root=root, split=split, transform=transform, download=download)
+    elif name == "ffhq":
+        split_map = {"train": "train", "valid": "val", "test": "val"}
+        dataset = datasets.ImageFolder(root=f"{root}/ffhq_thumbnail/{split_map[split]}",
+                                       transform=transform)
     elif name == "flowers102":
         # The split for Flowers102 is weird, as test has the highest number of images
         split_map = {"train": "test", "valid": "val", "test": "train"}
@@ -28,6 +32,10 @@ def get_dataset(name, shape, root="~/.torch/datasets", split="train",
                                 transform=transform)
     elif name == "miniplaces":
         dataset = MiniPlaces(root=root, split=split, transform=transform)
+    elif name == "imagenet64":
+        split_map = {"train": "train", "valid": "val", "test": "val"}
+        dataset = datasets.ImageFolder(root=f"{root}/imagenet64/{split_map[split]}",
+                                       transform=transform)
     elif name == "cifar10":
         split_map = {"train": True, "valid": False, "test": False}
         dataset = datasets.CIFAR10(root=root, train=split_map[split], transform=transform)
@@ -40,6 +48,11 @@ def get_dataset(name, shape, root="~/.torch/datasets", split="train",
     else:
         raise NotImplementedError(f"Dataset name {name} not supported.")
     return dataset
+
+
+def get_loader_samples(root, batch_size, stop_iteration=True):
+    loader = SampleLoader(batch_size=batch_size, root=root, stop_iteration=stop_iteration)
+    return loader
 
 
 def data_transform(x, zero_center=True, **kwargs):
@@ -57,7 +70,7 @@ def inverse_data_transform(x, zero_center=True, clamp=True, **kwargs):
 
 
 class MiniPlaces(data.Dataset):
-    def __init__(self, root, split, transform=None):
+    def __init__(self, root, split, transform=None, **kwargs):
         self.root = f"{root}/miniplaces"
         self.split = split
         self.transform = transform
@@ -92,6 +105,64 @@ class MiniPlaces(data.Dataset):
             image = self.transform(image)
         label = self.labels[i]
         return image, label
+
+
+class SampleLoader:
+
+    def __init__(self, batch_size, root, stop_iteration=True, **kwargs):
+        self.batch_size = batch_size
+        self.root = root
+        self.stop_iteration = stop_iteration
+
+        self.samples_file = {}
+        self.noises_file = {}
+
+        files = sorted(os.listdir(root))
+        for file in files:
+            if file[-4:] == ".pth":
+                if file[:8] == "samples_":
+                    i = int(file[8:-4])
+                    self.samples_file[i] = file
+                elif file[:7] == "noises_":
+                    i = int(file[7:-4])
+                    self.noises_file[i] = file
+
+        assert sorted(self.samples_file.keys()) == sorted(self.noises_file.keys()), \
+            "Samples and noises must have the same index file names"
+        self.data_batch_size = min(self.samples_file.keys())
+
+        self.i = 0
+        self.num_i = max(self.samples_file.keys())
+        self.samples = None
+        self.noises = None
+
+    def __iter__(self):
+        return self
+
+    def __len__(self):
+        return len(self.samples_file.keys()) * -(-self.data_batch_size // self.batch_size)
+
+    def __next__(self):
+        i_file = ((self.i // self.data_batch_size) + 1) * self.data_batch_size  # Quantize to batch
+        if self.samples is None or i_file > self.samples[1]:
+            samples = torch.load(f"{self.root}/{self.samples_file[i_file]}")
+            noises = torch.load(f"{self.root}/{self.noises_file[i_file]}")
+            self.samples = samples, i_file
+            self.noises = noises, i_file
+
+        offset = self.data_batch_size - i_file
+        sample = self.samples[0][self.i + offset:self.i + offset + self.batch_size]
+        noise = self.noises[0][self.i + offset:self.i + offset + self.batch_size]
+
+        self.i += sample.shape[0]
+        if self.i >= self.num_i:
+            self.i = 0
+            self.samples = None
+            self.noises = None
+            if self.stop_iteration:
+                raise StopIteration
+
+        return sample, noise
 
 
 class Augmentation:

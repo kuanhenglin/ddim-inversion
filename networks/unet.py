@@ -50,7 +50,10 @@ class ResnetBlock(nn.Module):
         # Convolution layer 1
         self.norm_1 = nutils.group_norm(in_channels, num_groups=num_groups)
         self.conv_1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=1, padding=1)
-        self.time_embed_proj = nn.Linear(time_embed_channels, out_channels)
+        if time_embed_channels is not None:
+            self.time_embed_proj = nn.Linear(time_embed_channels, out_channels)
+        else:
+            self.time_embed_proj = None
         # Convolution layer 2
         self.norm_2 = nutils.group_norm(out_channels, num_groups=num_groups)
         self.dropout = nn.Dropout(p=dropout)
@@ -63,14 +66,18 @@ class ResnetBlock(nn.Module):
         else:  # Identity skip (do nothing)
             self.conv_skip = nn.Identity()
 
-    def forward(self, x, time_embed):
+    def forward(self, x, t_embed=None):
         h = x  # Order for each layer: norm -> activation -> conv
         h = self.norm_1(h)
         h = nutils.swish(h)
         h = self.conv_1(h)
 
-        time_embed = nutils.swish(time_embed)
-        h = h + self.time_embed_proj(time_embed)[:, :, None, None]  # Apply to each channel
+        if self.time_embed_proj is not None:
+            if t_embed is None:
+                raise ValueError("time_embed cannot be None when the block is initialized with"
+                                 "time embedding projection.")
+            t_embed = nutils.swish(t_embed)
+            h = h + self.time_embed_proj(t_embed)[:, :, None, None]  # Apply to each channel
 
         h = self.norm_2(h)
         h = nutils.swish(h)
@@ -122,7 +129,8 @@ class AttentionBlock(nn.Module):
 class UNet(nn.Module):
 
     def __init__(self, in_shape, hidden_channels, num_blocks, channel_mults, attention_sizes,
-                 time_embed_channels, dropout=0.0, num_groups=16, do_conv_sample=True):
+                 time_embed_channels, dropout=0.0, num_groups=16, do_conv_sample=True,
+                 out_conv_zero=True):
         super().__init__()
 
         assert in_shape[1] == in_shape[2], f"Input shape must be square."
@@ -134,11 +142,14 @@ class UNet(nn.Module):
 
         # Time embedding
 
-        self.time_embed = nn.Module()
-        self.time_embed.fn = partial(nutils.time_embed, embed_dim=hidden_channels)
-        self.time_embed.dense = nn.ModuleList([
-            nn.Linear(hidden_channels, time_embed_channels),
-            nn.Linear(time_embed_channels, time_embed_channels)])
+        if time_embed_channels is not None:
+            self.time_embed = nn.Module()
+            self.time_embed.fn = partial(nutils.time_embed, embed_dim=hidden_channels)
+            self.time_embed.dense = nn.ModuleList([
+                nn.Linear(hidden_channels, time_embed_channels),
+                nn.Linear(time_embed_channels, time_embed_channels)])
+        else:
+            self.time_embed = None
 
         # Downsampling layers
 
@@ -212,17 +223,24 @@ class UNet(nn.Module):
         self.out_norm = nutils.group_norm(in_channels_block, num_groups=num_groups)
         self.out_conv = nn.Conv2d(in_channels_block, in_shape[0],
                                   kernel_size=3, stride=1, padding=1)
-        self.out_conv.weight.data.fill_(0.0)
+        if out_conv_zero:
+            self.out_conv.weight.data.fill_(0.0)
 
-    def forward(self, x, t):
+    def forward(self, x, t=None):
         assert list(x.shape[-3:]) == self.in_shape, \
                f"Shape of x {tuple(x.shape)} does not match network definition."
 
         # Time embedding
-        t_embed = self.time_embed.fn(t)
-        t_embed = self.time_embed.dense[0](t_embed)
-        t_embed = nutils.swish(t_embed)
-        t_embed = self.time_embed.dense[1](t_embed)
+        if self.time_embed is not None:
+            if t is None:
+                raise ValueError("t cannot be None when the U-Net is initialized with"
+                                 "time embedding projection.")
+            t_embed = self.time_embed.fn(t)
+            t_embed = self.time_embed.dense[0](t_embed)
+            t_embed = nutils.swish(t_embed)
+            t_embed = self.time_embed.dense[1](t_embed)
+        else:
+            t_embed = None
 
         # Downsampling
 
