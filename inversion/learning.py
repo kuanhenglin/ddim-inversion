@@ -68,14 +68,14 @@ class NoiseEncoder:
         for i in progress:
             do_log = self.loss_type == "reconstruction" or (i + 1) % log_frequency == 0 or i == 0
 
-            with torch.no_grad():
-                if loader is None:
+            if loader is None:
+                with torch.no_grad():
                     z = torch.randn(batch_size, *config.data.shape).to(self.device)
                     x = self.diffusion.sample(x=z, sequence=False, **diffusion_args)
-                else:
-                    x, z = next(iter(loader))
-                    x = x.to(self.device)
-                    z = z.to(self.device)
+            else:
+                x, z = next(iter(loader))
+                x = x.to(self.device)
+                z = z.to(self.device)
 
             if self.loss_type == "direct":
                 z_hat = self.network(x)

@@ -116,3 +116,6 @@ def classification(network, train_loader, valid_loader, classes, target_classes,
                 progress.write(result)
             i += 1
             progress.update(1)
+
+            if i == i_max:  # Stop at i_max
+                break
